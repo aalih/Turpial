@@ -13,17 +13,14 @@ import base64
 import logging
 from optparse import OptionParser
 
+path = os.environ['PATH'].split(';')
+path.insert(0, 'lib')
+os.environ['PATH'] = ';'.join(path)
+
 from turpial.ui.gtk.main import Main as _GTK
 from turpial.api.services import HTTPServices
 from turpial.api.turpialapi import TurpialAPI
 from turpial.config import ConfigHandler, ConfigApp
-
-try:
-    import ctypes
-    libc = ctypes.CDLL('libc.so.6')
-    libc.prctl(15, 'turpial', 0, 0)
-except ImportError:
-    pass
 
 class Turpial:
     '''Inicio de Turpial'''
@@ -74,7 +71,7 @@ class Turpial:
         self.httpserv.start()
         self.api.start()
         self.api.change_api_url(self.global_cfg.read('Proxy', 'url'))
-        
+
         if self.testmode:
             self.log.debug('Modo Pruebas Activado')
             

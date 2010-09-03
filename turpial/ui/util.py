@@ -49,7 +49,7 @@ def detect_urls(text):
 def get_rates(val):
     '''Returns the status bar message about API calls'''
     tsec = val['reset_time_in_seconds'] - time.timezone
-    t = time.strftime('%I:%M %P', time.gmtime(tsec))
+    t = time.strftime('%I:%M %p', time.gmtime(tsec))
     hits = val['remaining_hits']
     limit = val['hourly_limit']
     return "%s %s %s %s: %s" % (hits, _('of'), limit, _('API calls. Reset'), t)

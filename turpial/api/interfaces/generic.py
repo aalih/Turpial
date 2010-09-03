@@ -43,7 +43,7 @@ class GenericService:
         
         picdata = urllib2.urlopen(fileurl).read()
         
-        _file = open(fullname, 'w+')
+        _file = open(fullname, 'wb')
         _file.write(picdata)
         _file.close()
         

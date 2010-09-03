@@ -26,7 +26,7 @@ class Sound:
         
     def __play(self, filename):
         path = os.path.realpath(os.path.join(os.path.dirname(__file__),
-            'data', 'sounds', filename))
+            '..', '..', 'data', 'sounds', filename))
         if not self.sound:
             return
             
@@ -37,6 +37,8 @@ class Sound:
         except pygameerror, message:
             self.log.debug('Can\'t load sound: %s\nDetails: %s' % (path, 
                 message))
+        except Exception, message:
+            self.log.debug('Sound error: %s\nDetails: %s' % (path, message))
         
     def login(self):
         self.__play('cambur_pinton.ogg')
