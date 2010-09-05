@@ -1,0 +1,22 @@
+Instalar el runtime de gtk
+Instalar python
+Instalar py2exe, pycairo, pygobject, pygtk, pygame
+Instalar gtkPopupNotify
+
+Desde la linea de comandos ejecutar:
+  python setup_win32.py py2exe
+
+Esto creara un directorio llamado dist, en dicho directorio deben copiarse lo siguiente:
+
+1.- Directorios etc, lib y share del runtime de gtk
+En el caso del directorio lib pueden eliminarse todos los ficheros que no sean dll siempre que se mantenga la estructura de directorios.
+En el caso del directorio share pueden eliminarse los themes y locales que no se necesitan
+
+2.- Ficheros libogg-*.dll y SDL_ttf.dll de la instalacion de pygame (disponibles en el directorio site-packages de su instalacion de python)
+
+Para mejorar la organizacion todos los ficheros dll (exceptuando python*.dll) pueden moverse hacia la carpeta lib creada anteriormente.
+
+Una vez realizados estos pasos, la carpeta dist contendra todos los ficheros necesarios para ejecutar turpial en una pc. El cliente tambien debera instalar
+el Microsoft Visual C++ 2008 Redistributable Package que contiene dlls necesarias.
+
+Para crear el instalador debe instalar nsis, una vez hecho esto de click derecho en el fichero y seleccione "Compile NSIS script".
