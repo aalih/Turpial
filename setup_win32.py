@@ -8,7 +8,6 @@ import glob
 
 opts = {
     'py2exe': {
-        # ConfigParser,UserString,roman are needed for docutils
         'includes': ('pango,atk,gobject,cairo,pangocairo,gtk.keysyms,gio,encodings,encodings.*'),
         'dll_excludes': [
             'iconv.dll', 'intl.dll', 'libatk-1.0-0.dll',
@@ -18,6 +17,7 @@ opts = {
             'libgtk-win32-2.0-0.dll', 'libpango-1.0-0.dll',
             'libpangowin32-1.0-0.dll', 'libcairo-2.dll',
             'libpangocairo-1.0-0.dll', 'libpangoft2-1.0-0.dll',
+            'libenchant.dll'
         ],
         'optimize': 2,
     }

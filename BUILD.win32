@@ -1,6 +1,6 @@
 Instalar el runtime de gtk
 Instalar python
-Instalar py2exe, pycairo, pygobject, pygtk, pygame
+Instalar py2exe, pycairo, pygobject, pygtk, pygame, PyGTKSpell, PyEnchant
 Instalar gtkPopupNotify
 
 Desde la linea de comandos ejecutar:
@@ -13,6 +13,11 @@ En el caso del directorio lib pueden eliminarse todos los ficheros que no sean d
 En el caso del directorio share pueden eliminarse los themes y locales que no se necesitan
 
 2.- Ficheros libogg-*.dll y SDL_ttf.dll de la instalacion de pygame (disponibles en el directorio site-packages de su instalacion de python)
+
+3.- Ficheros libenchant*.dll e iconv.dll de la instalacion de PyEnchant
+
+4.- Directorios lib y share de la instalacion de PyEnchant
+En el caso del directorio share pueden eliminarse los diccionarios correspondientes a los idiomas para los que no se necesita soporte
 
 Para mejorar la organizacion todos los ficheros dll (exceptuando python*.dll) pueden moverse hacia la carpeta lib creada anteriormente.
 

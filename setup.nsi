@@ -43,6 +43,7 @@
 ;Installer Sections
 
 InstType "Full"
+InstType "Custom"
 
 Section "Package" SecMain
   
@@ -72,7 +73,7 @@ Section "Package" SecMain
   File /x python*.dll "dist\*.dll"
 
   SetOutPath "$INSTDIR\share"
-  File /r "dist\share\*"
+  File /r /x "dist\share\enchant\*" "dist\share\*"
    
   ;Store installation folder
   WriteRegStr HKLM "Software\Turpial" "" $INSTDIR
@@ -88,15 +89,39 @@ Section "Package" SecMain
   CreateShortCut "$SMPROGRAMS\Turpial\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
 
 SectionEnd
+
+SectionGroup "Dictionaries" SecGroupDict
+
+Section "English" SecDictEng
+
+SectionIn 1 2 RO
+SetOutPath "$INSTDIR\share\enchant\myspell"
+File "dist\share\enchant\myspell\en_*"
+
+SectionEnd
+
+Section "French" SecDictFr
+
+SectionIn 1 2
+SetOutPath "$INSTDIR\share\enchant\myspell"
+File "dist\share\enchant\myspell\fr_*"
+
+SectionEnd
+
+SectionGroupEnd
 ;--------------------------------
 ;Descriptions
 
   ;Language strings
   LangString DESC_SecMain ${LANG_ENGLISH} "Main Package"
+  LangString DESC_Main ${LANG_ENGLISH} "Programs and data needed to execute Turpial"
+  LangString DESC_SecGroupDict ${LANG_ENGLISH} "Dictionaries"
+  LangString DESC_GroupDict ${LANG_ENGLISH} "Dictionaries for the spelling feature"
 
   ;Assign language strings to sections
   !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
     !insertmacro MUI_DESCRIPTION_TEXT ${SecMain} $(DESC_Main)
+    !insertmacro MUI_DESCRIPTION_TEXT ${SecGroupDict} $(DESC_GroupDict)
   !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
 ;--------------------------------
