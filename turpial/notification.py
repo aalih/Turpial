@@ -7,17 +7,11 @@
 
 import os
 import logging
+import gtkPopupNotify
 
 from turpial.sound import Sound
 
 log = logging.getLogger('Notify')
-
-try:
-    import pynotify
-    NOTIFY = True
-except ImportError:
-    log.debug("pynotify is not installed")
-    NOTIFY = False
 
 class Notification:
     """Manejo de notificaciones"""
@@ -25,6 +19,8 @@ class Notification:
         self.activate()
         self.play = True
         self.sound = Sound()
+        self.notifier = gtkPopupNotify.NotificationStack(timeout=10)
+        self.notifier.edge_offset_y=20
         
     def update_config(self, config):
         self.config = config
@@ -42,15 +38,11 @@ class Notification:
         self.active = False
         
     def popup(self, title, message, icon=None):
-        if self.active and NOTIFY:
-            if pynotify.init("Turpial"):
-                if not icon:
-                    iconpath = os.path.join(os.path.dirname(__file__), 'data', 
-                        'pixmaps', 'turpial-notification.png')
-                    icon = os.path.realpath(iconpath)
-                icon = "file://%s" % icon
-                notification = pynotify.Notification(title, message, icon)
-                notification.show()
+        if self.active:
+            if not icon:
+                icon = os.path.realpath(os.path.join(os.path.dirname(__file__),
+                    '..', '..', 'data', 'pixmaps', 'turpial.png'))
+            self.notifier.new_popup(title, message, icon)
                 
     def new_tweets(self, count, tweet, icon):
         if self.config['home'] != 'on':

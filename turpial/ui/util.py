@@ -59,7 +59,7 @@ def get_rates(resp):
     else:
         val = resp.items
         tsec = val.reset_time_in_seconds - time.timezone
-        t = time.strftime('%I:%M %P', time.gmtime(tsec))
+        t = time.strftime('%I:%M %p', time.gmtime(tsec))
         hits = val.remaining_hits
         limit = val.hourly_limit
         return "%s %s %s %s: %s" % (hits, _('of'), limit, _('API calls. Reset'), t)
