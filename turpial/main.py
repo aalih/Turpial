@@ -45,6 +45,7 @@ class Turpial:
         self.testmode = options.test
         self.httpserv = None
         self.api = None
+        self.version = self.global_cfg.read('App', 'version')
         
         if options.debug or options.clean: 
             logging.basicConfig(level=logging.DEBUG)
@@ -57,7 +58,7 @@ class Turpial:
             sys.exit(0)
             
         if options.version:
-            print "Turpial version %s" % self.global_cfg.read('App', 'version')
+            print "Turpial version %s" % self.version
             sys.exit(0)
             
         self.interface = options.interface
@@ -74,7 +75,7 @@ class Turpial:
         self.httpserv = HTTPServices()
         self.api = TurpialAPI()
         
-        self.log.debug('Iniciando Turpial')
+        self.log.debug('Iniciando Turpial v%s' % self.version)
         self.httpserv.start()
         self.api.start()
         self.api.change_api_url(self.global_cfg.read('Proxy', 'url'))
@@ -89,31 +90,6 @@ class Turpial:
             self.log.debug('Interceptado Keyboard Interrupt')
             self.signout()
         
-    def __set_proxy(self, client, *args, **kwargs):
-        proxies = {}
-        if client.get_bool('/system/http_proxy/use_http_proxy'):
-            proxies['http'] = "http://%s:%d" % (client.get_string('/system/http_proxy/host'), client.get_int('/system/http_proxy/port'))
-            if client.get_bool('/system/http_proxy/use_same_proxy'):
-                proxies['https'] = proxies['http'].replace('http:', 'https:')
-            elif client.get_string('/system/proxy/secure_host'):
-                proxies['https'] = "https://%s:%d" % (gclient.get_string('/system/http/secure_host'), gclient.get_int('/system/proxy/secure_port'))
-
-        if proxies:
-            if client.get_bool('/system/http_proxy/use_authentication'):
-                self.log.debug('Usando proxy con autenticacion')
-                puser = urllib.quote(client.get_string('/system/http_proxy/authentication_user'))
-                ppass = urllib.quote(client.get_string('/system/http_proxy/authentication_password'))
-                for schema, proxy in proxies.items():
-                    proxies[schema] = proxy.replace("%s://" % schema, "%s://%s:%s@" % (schema, puser, ppass))
-            else:
-                self.log.debug('Usando proxy sin autenticacion')
-            proxy_handler = urllib2.ProxyHandler(proxies)
-            opener = urllib2.build_opener(proxy_handler, urllib2.HTTPHandler)
-        else:
-            self.log.debug('No usando proxies')
-            opener = urllib2.build_opener()
-        urllib2.install_opener(opener)
-
     def __clean(self):
         '''Limpieza de ficheros .pyc y .pyo'''
         self.log.debug("Limpiando la casa...")
@@ -246,7 +222,6 @@ class Turpial:
             d = c[1:-1]
             e = base64.b16decode(d)
             pwd = e[0:len(us)]+ e[len(us):]
-            #print pwd
             return us, pwd, True
         else:
             return us, pw, False
