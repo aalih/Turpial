@@ -32,10 +32,14 @@ class BaseGui:
         
         # Initialize gettext
         gettext_domain = 'turpial'
-        # FIXME: Definir path de localedir en caso de no encontrar esperado
-        # localedir = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'i18n'))
-        # trans = gettext.install(gettext_domain, localedir)
-        trans = gettext.install(gettext_domain)
+        # Definicion de localedir en modo desarrollo
+        if os.path.isdir(os.path.join(os.path.dirname(__file__), '..', 'i18n')):
+            localedir = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'i18n'))
+            trans = gettext.install(gettext_domain, localedir)
+            log.debug('LOCALEDIR: %s' % localedir)
+        else:
+            trans = gettext.install(gettext_domain)
+            
     # ------------------------------------------------------------
     # Private/Internal methods
     # ------------------------------------------------------------
@@ -122,13 +126,13 @@ class BaseGui:
         '''Saves the global config'''
         self.__controller.save_global_config(new_config)
     
-    def request_remember(self, username, password, rem=False):
+    def request_remember(self, username, password, protocol, rem=False):
         '''Request remember'''
-        self.__controller.remember(username, password, rem)
+        self.__controller.remember(username, password, protocol, rem)
         
-    def request_remembered(self):
+    def request_remembered(self, protocol):
         '''Request simple signin'''
-        return self.__controller.get_remembered()
+        return self.__controller.get_remembered(protocol)
     
     def request_signin(self, username, password, protocol):
         '''Request simple signin'''
@@ -322,7 +326,7 @@ class BaseGui:
     # ------------------------------------------------------------
     
     def resize_avatar(self, pic):
-        raise NotImplemented
+        raise NotImplementedError
         
     def main_loop(self):
         raise NotImplementedError
