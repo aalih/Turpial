@@ -58,7 +58,9 @@ Section "Package" SecMain
   File "dist\*.pyd"
   File "dist\*.zip"
   File "dist\python*.dll"
+  File "dist\libenchant-1.dll"
 
+  CopyFiles /SILENT "$INSTDIR\libenchant-1.dll" "$INSTDIR\libenchant.dll"
   CreateShortCut "$INSTDIR\turpial.lnk" "$INSTDIR\main.exe"
   CreateShortCut "$INSTDIR\turpial (DEBUG).lnk" "$INSTDIR\main.exe" "-d"
 
@@ -70,7 +72,7 @@ Section "Package" SecMain
 
   SetOutPath "$INSTDIR\lib"
   File /r "dist\lib\*"
-  File /x python*.dll "dist\*.dll"
+  File /x python*.dll /x libenchant*.dll /x libg*.dll /x intl.dll "dist\*.dll"
 
   SetOutPath "$INSTDIR\share"
   File /r /x "dist\share\enchant\*" "dist\share\*"

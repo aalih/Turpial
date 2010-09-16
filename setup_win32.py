@@ -5,6 +5,7 @@
 from distutils.core import setup
 import py2exe
 import glob
+import enchant
 
 opts = {
     'py2exe': {
@@ -37,5 +38,5 @@ setup(
               'icon_resources': [(1, 'turpial.ico')]},
             ],
     options=opts,
-    data_files=support_files,
+    data_files=support_files+enchant.utils.win32_data_files(),
 )
