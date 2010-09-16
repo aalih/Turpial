@@ -109,6 +109,22 @@ File "dist\share\enchant\myspell\fr_*"
 
 SectionEnd
 
+Section "Spanish" SecDictEs
+
+SectionIn 1
+SetOutPath "$INSTDIR\share\enchant\myspell"
+File "dist\share\enchant\myspell\es_*"
+
+SectionEnd
+
+Section "Portuguese" SecDictPt
+
+SectionIn 1
+SetOutPath "$INSTDIR\share\enchant\myspell"
+File "dist\share\enchant\myspell\pt_*"
+
+SectionEnd
+
 SectionGroupEnd
 ;--------------------------------
 ;Descriptions
