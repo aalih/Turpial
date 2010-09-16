@@ -43,7 +43,6 @@
 ;Installer Sections
 
 InstType "Full"
-InstType "Custom"
 
 Section "Package" SecMain
   
@@ -96,7 +95,7 @@ SectionGroup "Dictionaries" SecGroupDict
 
 Section "English" SecDictEng
 
-SectionIn 1 2 RO
+SectionIn 1 RO
 SetOutPath "$INSTDIR\share\enchant\myspell"
 File "dist\share\enchant\myspell\en_*"
 
@@ -104,7 +103,7 @@ SectionEnd
 
 Section "French" SecDictFr
 
-SectionIn 1 2
+SectionIn 1
 SetOutPath "$INSTDIR\share\enchant\myspell"
 File "dist\share\enchant\myspell\fr_*"
 
