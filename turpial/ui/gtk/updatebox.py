@@ -15,6 +15,9 @@ try:
 except:
     pass
 
+import logging
+log = logging.getLogger('UpdateBox')
+
 from turpial.ui.gtk.waiting import CairoWaiting
 from turpial.ui.gtk.friendwin import FriendsWin
 
@@ -137,11 +140,9 @@ class UpdateBox(gtk.Window):
             try:
                 self.spell = gtkspell.Spell (self.update_text)
             except Exception, e_msg:
-                # FIXME: Usar el log
-                print 'DEBUG:UI:Can\'t load gtkspell -> %s' % e_msg
+                log.debug("Can't load gtkspell: %s" % e_msg)
         else:
-            # FIXME: Usar el log
-            print 'DEBUG:UI:Can\'t load gtkspell'
+            log.debug("gtkspell not loaded")
     
     def __on_key_pressed(self, widget, keyval, keymod):
         if keyval == gtk.keysyms.Return:
