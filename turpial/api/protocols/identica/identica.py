@@ -9,12 +9,14 @@ from turpial.api.interfaces.protocol import Protocol
 from turpial.api.interfaces.http import TurpialException
 from turpial.api.protocols.identica.http import IdenticaHTTP
 from turpial.api.interfaces.post import Status, Response, Profile, RateLimit
+from turpial.config import PROTOCOLS
+from turpial.config import UPDATE_TYPE_DM, UPDATE_TYPE_STD, UPDATE_TYPE_PROFILE
 
 
 class Identica(Protocol):
     def __init__(self):
         Protocol.__init__(self, 'Identi.ca', 'http://identi.ca/api', 
-            'http://identi.ca/api', 'http://identi.ca/tag', 
+            'http://identi.ca/api', 'http://identi.ca/tag/', 
             'http://identi.ca/group', 'http://identi.ca')
         
         self.http = IdenticaHTTP()
@@ -36,7 +38,7 @@ class Identica(Protocol):
         else:
             return username
     
-    def __create_status(self, resp):
+    def __create_status(self, resp, type=UPDATE_TYPE_STD):
         tweet, retweet_by = self.__get_real_tweet(resp)
         
         if tweet.has_key('user'):
@@ -62,6 +64,11 @@ class Identica(Protocol):
         source = None
         if tweet.has_key('source'):
             source = tweet['source']
+            
+        if username.lower() == self.profile.username.lower():
+            own = True
+        else:
+            own = False
         
         status = Status()
         status.id = str(tweet['id'])
@@ -73,7 +80,11 @@ class Identica(Protocol):
         status.in_reply_to_user = in_reply_to_user
         status.is_favorite = fav
         status.retweet_by = retweet_by
-        status.datetime = tweet['created_at']
+        status.datetime = self.get_str_time(tweet['created_at'])
+        status.timestamp = self.get_int_time(tweet['created_at'])
+        status.type = type
+        status.protocol = PROTOCOLS[1]
+        status.is_own = own
         return status
         
     def __create_profile(self, pf):
@@ -126,10 +137,10 @@ class Identica(Protocol):
         
         return users
         
-    def response_to_statuses(self, response, mute=False):
+    def response_to_statuses(self, response, mute=False, type=UPDATE_TYPE_STD):
         statuses = []
         for resp in response:
-            status = self.__create_status(resp)
+            status = self.__create_status(resp, type)
             #if status.retweet_by:
             #    users = self.__get_retweet_users(status.id)
             #    status.retweet_by = users
@@ -148,6 +159,7 @@ class Identica(Protocol):
         username = args['username']
         password = args['password']
         auth = args['auth']
+        protocol = args['protocol']
         
         try:
             self.http.auth(username, password, None)
@@ -156,12 +168,12 @@ class Identica(Protocol):
             self.profile = self.__create_profile(rtn)
             self.profile.password = password
             
-            return Response(self.profile, 'profile'), None, None
+            return Response(self.profile, 'profile'), None, None, protocol
         except TurpialException, exc:
-            return Response(None, 'error', exc.msg), None, None
+            return Response(None, 'error', exc.msg), None, None, None
         except Exception, exc:
             self.log.debug('Authentication Error: %s' % exc)
-            return Response(None, 'error', _('Authentication Error')), None, None
+            return Response(None, 'error', _('Authentication Error')), None, None, None
         
     def get_timeline(self, args):
         '''Actualizando linea de tiempo'''
@@ -172,7 +184,7 @@ class Identica(Protocol):
             rtn = self.http.request('%s/statuses/home_timeline' % 
                 self.apiurl, {'count': count})
             self.timeline = self.response_to_statuses(rtn)
-            return Response(self.get_muted_timeline(), 'status')
+            return Response(self.get_muted_timeline(self.timeline), 'status')
         except TurpialException, exc:
             return Response(None, 'error', exc.msg)
         
@@ -196,6 +208,19 @@ class Identica(Protocol):
         
         try:
             rtn = self.http.request('%s/direct_messages' % self.apiurl, 
+                {'count': count})
+            self.directs = self.response_to_statuses(rtn, type=UPDATE_TYPE_DM)
+            return Response(self.directs, 'status')
+        except TurpialException, exc:
+            return Response(None, 'error', exc.msg)
+            
+    def get_sent(self, args):
+        '''Actualizando mensajes enviados'''
+        self.log.debug('Descargando mis dents')
+        count = args['count']
+        
+        try:
+            rtn = self.http.request('%s/statuses/user_timeline' % self.apiurl, 
                 {'count': count})
             self.directs = self.response_to_statuses(rtn)
             return Response(self.directs, 'status')
@@ -312,8 +337,7 @@ class Identica(Protocol):
             rtn = self.http.request('%s/statuses/update' % self.apiurl, args)
             status = self.__create_status(rtn)
             self._add_status(self.timeline, status)
-            timeline = self.get_muted_timeline()
-            return Response(timeline, 'status')
+            return Response(self.get_muted_timeline(self.timeline), 'status')
         except TurpialException, exc:
             return Response(None, 'error', exc.msg)
         
@@ -328,8 +352,7 @@ class Identica(Protocol):
                 {'id': id})
             
             self._destroy_status(str(rtn['id']))
-            timeline = self.get_muted_timeline()
-            return (Response(timeline, 'status'), 
+            return (Response(self.get_muted_timeline(self.timeline), 'status'), 
                 Response(self.favorites, 'status'))
         except TurpialException, exc:
             return (Response(None, 'error', exc.msg), 
@@ -347,8 +370,7 @@ class Identica(Protocol):
             #status.retweet_by = users
             # FIXME: Modificar también los replies y favoritos
             self._add_status(self.timeline, status)
-            timeline = self.get_muted_timeline()
-            return Response(timeline, 'status')
+            return Response(self.get_muted_timeline(self.timeline), 'status')
         except TurpialException, exc:
             return Response(None, 'error', exc.msg)
         
@@ -362,8 +384,7 @@ class Identica(Protocol):
                 {'id': id})
             status = self.__create_status(rtn)
             self._set_status_favorite(status)
-            timeline = self.get_muted_timeline()
-            return (Response(timeline, 'status'), 
+            return (Response(self.get_muted_timeline(self.timeline), 'status'), 
                 Response(self.replies, 'status'),
                 Response(self.favorites, 'status'))
         except TurpialException, exc:
@@ -382,8 +403,7 @@ class Identica(Protocol):
                 {'id': id})
             status = self.__create_status(rtn)
             self._unset_status_favorite(status)
-            timeline = self.get_muted_timeline()
-            return (Response(timeline, 'status'), 
+            return (Response(self.get_muted_timeline(self.timeline), 'status'), 
                 Response(self.replies, 'status'),
                 Response(self.favorites, 'status'))
         except TurpialException, exc:

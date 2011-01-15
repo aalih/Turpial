@@ -13,6 +13,7 @@ import traceback
 from turpial.api.protocols.twitter import twitter
 from turpial.api.protocols.identica import identica
 from turpial.api.interfaces.post import Response
+from turpial.config import PROTOCOLS
 
 class TurpialAPI(threading.Thread):
     '''API basica de turpial basada en hilos'''
@@ -55,11 +56,12 @@ class TurpialAPI(threading.Thread):
     
     def auth(self, username, password, auth_info, protocol, callback):
         '''Inicio de autenticacion'''
-        args = {'username': username, 'password': password, 'auth': auth_info}
+        args = {'username': username, 'password': password, 'auth': auth_info,
+            'protocol': protocol}
         self.log.debug('Solicitando autenticacion')
-        if protocol == 0:
+        if protocol == PROTOCOLS[0]:
             self.protocol = twitter.Twitter()
-        elif protocol == 1:
+        elif protocol == PROTOCOLS[1]:
             self.protocol = identica.Identica()
         self.__register(self.protocol.auth, args, callback)
             
@@ -92,7 +94,7 @@ class TurpialAPI(threading.Thread):
         
     def update_sent(self, callback, count=20):
         '''Actualizando mensajes enviados'''
-        self.log.debug('Solicitando Enviados')
+        self.log.debug('Solicitando Mis Tweets')
         self.__register(self.protocol.get_sent, {'count': count}, callback)
         
     def update_list(self, callback, column, count=20):
@@ -215,6 +217,8 @@ class TurpialAPI(threading.Thread):
             try:
                 req = self.queue.get(True, 0.3)
             except Queue.Empty:
+                continue
+            except:
                 continue
             
             (funct, args, callback) = req

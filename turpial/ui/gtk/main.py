@@ -13,6 +13,7 @@ import gobject
 import webbrowser
 
 from turpial.ui.gtk.updatebox import UpdateBox
+from turpial.ui.gtk.uploadpicbox import UploadPicBox
 from turpial.ui.gtk.conversation import ConversationBox
 from turpial.ui.gtk.login import LoginBox
 from turpial.ui.gtk.preferences import Preferences
@@ -23,6 +24,7 @@ from turpial.ui.gtk.follow import Follow
 from turpial.ui.base_ui import BaseGui
 from turpial.notification import Notification
 from turpial.ui import util as util
+from turpial.sound import Sound
 
 try:
     import webkit
@@ -50,11 +52,13 @@ class Main(BaseGui, gtk.Window):
         self.current_height = 480
         self.set_icon(self.load_image('turpial.png', True))
         self.set_position(gtk.WIN_POS_CENTER)
+        self.set_gravity(gtk.gdk.GRAVITY_STATIC)
         self.connect('delete-event', self.__close)
         self.connect('size-request', self.size_request)
         self.connect('configure-event', self.move_event)
         self.connect('key-press-event', self.__on_key_press)
         self.connect('focus-in-event', self.__on_focus)
+        self.hnd_state = None
         
         self.mode = 0
         self.vbox = None
@@ -62,9 +66,10 @@ class Main(BaseGui, gtk.Window):
         
         # Valores de config. por defecto
         self.showed = True
+        self.win_state = 'windowed'
         self.minimize = 'on'
         self.workspace = 'single'
-        self.link_color = 'ff6633'
+        self.link_color = '#ff6633'
         self.home_interval = -1
         self.replies_interval = -1
         self.directs_interval = -1
@@ -75,12 +80,14 @@ class Main(BaseGui, gtk.Window):
         self.replies_timer = None
         self.directs_timer = None
         
-        self.notify = Notification()
+        self.sound = Sound(controller.no_sound)
+        self.notify = Notification(controller.no_notif)
         
         self.home = Home(self, self.workspace)
         self.profile = Profile(self)
         self.contenido = self.home
         self.updatebox = UpdateBox(self)
+        self.uploadpic = UploadPicBox(self)
         self.replybox = ConversationBox(self)
         
         if self.extend:
@@ -102,16 +109,37 @@ class Main(BaseGui, gtk.Window):
         self.tray.connect("popup-menu", self.__show_tray_menu)
         
     def __on_trayicon_click(self, widget):
-        if(self.showed is True):
+        if self.showed:
             self.showed = False
             self.hide()
         else:
             self.showed = True
             self.show()
+            if self.workspace == 'wide':
+                self.move(self.win_wide_pos[0], self.win_wide_pos[1])
+            else:
+                self.move(self.win_single_pos[0], self.win_single_pos[1])
             
     def __on_focus(self, widget, event):
         self.tray.set_from_pixbuf(self.load_image('turpial-tray.png', True))
-        gobject.timeout_add(5000, self.__unset_bg_color)
+    
+    def __on_key_press(self, widget, event):
+        keyname = gtk.gdk.keyval_name(event.keyval)
+        if (event.state & gtk.gdk.CONTROL_MASK) and keyname.lower() == 'n':
+            self.show_update_box()
+            return True
+        return False
+    
+    def __on_change_state(self, widget, event, data=None):
+        if event.type != gtk.gdk.WINDOW_STATE:
+            return False
+        
+        if event.new_window_state == gtk.gdk.WINDOW_STATE_ICONIFIED:
+            self.win_state = 'minimized'
+        elif event.new_window_state == gtk.gdk.WINDOW_STATE_MAXIMIZED:
+            self.win_state = 'maximized'
+        elif event.new_window_state == 0:
+            self.win_state = 'windowed'
         
     def __show_tray_menu(self, widget, button, activate_time):
         menu = gtk.Menu()
@@ -126,7 +154,7 @@ class Main(BaseGui, gtk.Window):
         
         exit.connect('activate', self.quit)
         tweet.connect('activate', self.__show_update_box_from_menu)
-        follow.connect('activate', self.__follow_from_menu)
+        follow.connect('activate', self.__show_follow_box_from_menu)
             
         menu.show_all()
         menu.popup(None, None, None, button, activate_time)
@@ -134,8 +162,8 @@ class Main(BaseGui, gtk.Window):
     def __show_update_box_from_menu(self, widget):
         self.show_update_box()
         
-    def __follow_from_menu(self, widget):
-        f = Follow(self)
+    def __show_follow_box_from_menu(self, widget):
+        self.show_follow_box()
         
     def __close(self, widget, event=None):
         if self.minimize == 'on':
@@ -147,21 +175,64 @@ class Main(BaseGui, gtk.Window):
         
     def __save_size(self):
         if self.mode < 2: return
+        
         wide_value = "%i, %i" % (self.wide_win_size[0], self.wide_win_size[1])
         single_value = "%i, %i" % (self.single_win_size[0], self.single_win_size[1])
-        pos_value = "%i, %i" % (self.win_pos[0], self.win_pos[1])
-        log.debug('Guardando tamaño de la ventana')
+        single_pos = "%i, %i" % (self.win_single_pos[0], self.win_single_pos[1])
+        wide_pos = "%i, %i" % (self.win_wide_pos[0], self.win_wide_pos[1])
+        visibility = 'show' if self.showed else 'hide'
+        log.debug('Guardando configuración de la ventana')
         log.debug('--Single: %s' % single_value)
         log.debug('--Wide: %s' % wide_value)
-        log.debug('--Position: %s' % pos_value)
-        self.save_config({'General': {'single-win-size': single_value,
-            'wide-win-size': wide_value, 'window-position': pos_value}},
-            update=False)
-    
-    def __unset_bg_color(self):
-        self.home.timeline.clear_bg_color()
-        return False
+        log.debug('--Single Position: %s' % single_pos)
+        log.debug('--Wide Position: %s' % wide_pos)
+        log.debug('--State: %s' % self.win_state)
+        self.save_config({'Window': {
+            'single-win-size': single_value,
+            'wide-win-size': wide_value, 
+            'window-single-position': single_pos,
+            'window-wide-position': wide_pos,
+            'window-state': self.win_state,
+            'window-visibility': visibility,
+            }}, update=False)
         
+    def _notify_new_tweets(self, column, tweets, last, count):
+        if count <= 0:
+            return
+        
+        tweet = None
+        for twt in tweets.items:
+            if twt.username != self.me:
+                if not util.has_tweet(last, twt):
+                    tweet = twt
+                    break
+        
+        if not tweet:
+            return
+        
+        if count == 1:
+            tobject = column.single_unit
+        else:
+            tobject = column.plural_unit
+        
+        p = self.parse_tweet(tweet)
+        icon = self.current_avatar_path(p.avatar)
+        twt = util.unescape_text(p.text)
+        text = "<b>@%s</b> %s" % (p.username, twt)
+        
+        self.notify.new_tweets(column.title, count, tobject, text, icon)
+        
+        if self.read_config_value('Notifications', 'sound') == 'on':
+            if column.id == 'replies':
+                self.sound.replies()
+            elif column.id == 'directs':
+                self.sound.directs()
+            else:
+                self.sound.tweets()
+        
+        if not self.get_property('is-active'):
+            self.tray.set_from_pixbuf(self.load_image('turpial-tray-update.png', True))
+                
     def load_image(self, path, pixbuf=False):
         img_path = os.path.realpath(os.path.join(os.path.dirname(__file__),
             '..', '..', '..', '..', 'data', 'pixmaps', path))
@@ -248,38 +319,53 @@ class Main(BaseGui, gtk.Window):
         
         self.update_config(config, global_cfg, True)
         
-        ##gtk.gdk.threads_enter()
-        def show_main_temp():
-            self.contentbox.add(self.contenido)
-
-            self.statusbar = gtk.Statusbar()
-            self.statusbar.push(0, _('Wait a few seconds while I load everything...'))
-            if (self.vbox is not None): self.remove(self.vbox)
-
-            self.vbox = gtk.VBox(False, 0)
-            self.vbox.pack_start(self.contentbox, True, True, 0)
-            self.vbox.pack_start(self.dock, False, False, 0)
-            self.vbox.pack_start(self.statusbar, False, False, 0)
-
-            self.profile.set_user_profile(p)
-            self.me = p.items.username
-            title = 'Turpial - %s' % self.me
-            self.set_title(title)
-            self.tray.set_tooltip(title)
-
-            if config.read('General', 'profile-color') == 'on':
-                self.link_color = p.items.profile_link_color
-
-            self.add(self.vbox)
-            self.show_all()
-            if (self.win_pos[0] > 0 and self.win_pos[1] > 0):
-                self.move(self.win_pos[0], self.win_pos[1])
+        gtk.gdk.threads_enter()
+        self.contentbox.add(self.contenido)
+        
+        self.statusbar = gtk.Statusbar()
+        self.statusbar.push(0, _('Wait a few seconds while I load everything...'))
+        if (self.vbox is not None): self.remove(self.vbox)
+        
+        self.vbox = gtk.VBox(False, 0)
+        self.vbox.pack_start(self.contentbox, True, True, 0)
+        self.vbox.pack_start(self.dock, False, False, 0)
+        self.vbox.pack_start(self.statusbar, False, False, 0)
+        
+        self.profile.set_user_profile(p)
+        self.me = p.items.username
+        title = 'Turpial - %s' % self.me
+        self.set_title(title)
+        self.tray.set_tooltip(title)
+        
+        if config.read('General', 'profile-color') == 'on':
+            self.link_color = p.items.profile_link_color
+        
+        self.add(self.vbox)
+        self.show_all()
+        
+        '''
+        if self.win_state == 'minimized':
+            self.iconify()
+        elif self.win_state == 'maximized':
+            self.maximize()
+        elif self.win_visibility == 'hide':
+            self.hide()
+        '''
+        
+        self.hnd_state = self.connect('window-state-event', self.__on_change_state)
+        
+        #if (self.win_pos[0] > 0 and self.win_pos[1] > 0):
+        #    self.move(self.win_pos[0], self.win_pos[1])
+        gtk.gdk.threads_leave()
+        
+        if config.read('Notifications', 'login') == 'on':
             self.notify.login(p.items)
-            return False
-        gobject.idle_add(show_main_temp)
-        ##gtk.gdk.threads_leave()
+            if config.read('Notifications', 'sound') == 'on':
+                self.sound.login()
         
         gobject.timeout_add(6 * 60 * 1000, self.download_rates)
+        gobject.timeout_add(12 * 60 * 1000, self.download_favorites)
+        gobject.timeout_add(15 * 60 * 1000, self.download_friends)
         
     def set_lists(self, lists, viewed):
         self.columns_lists = lists
@@ -305,6 +391,15 @@ class Main(BaseGui, gtk.Window):
             return
         self.updatebox.show(text, id, user)
         
+    def show_follow_box(self):
+        f = Follow(self)
+        
+    def show_uploadpic_box(self):
+        if self.uploadpic.get_property('visible'): 
+            self.uploadpic.present()
+            return
+        self.uploadpic.show()
+        
     def show_preferences(self, widget, mode='user'):
         prefs = Preferences(self, mode)
         
@@ -321,74 +416,49 @@ class Main(BaseGui, gtk.Window):
         self.profile.search.start_update()
         
     def update_column1(self, tweets):
-        log.debug(u'Actualizando el timeline')
-        ##gtk.gdk.threads_enter()
-        def update_column1_temp():
-            last = self.home.timeline.last
-            count = self.home.timeline.update_tweets(tweets)
-
-            if count > 0 and self.updating[1]:
-                tweet = None
-                i = 0
-                while 1:
-                    if tweets.items[i].username == self.me:
-                        if not util.has_tweet(last, tweets.items[i]):
-                            tweet = tweets.items[i]
-                            break
-                    else:
-                        tweet = tweets.items[i]
-                        break
-                    i += 1
-
-                p = self.parse_tweet(tweet)
-                icon = self.current_avatar_path(p.avatar)
-                text = util.unescape_text(p.text)
-                text = "<b>@%s</b> %s" % (p.username, text)
-                self.notify.new_tweets(count, text, icon)
-                if not self.get_property('is-active'):
-                    self.tray.set_from_pixbuf(self.load_image('turpial-tray-update.png', True))
-                self.updating[1] = False
-            return False
-        gobject.idle_add(update_column1_temp)
-        ##gtk.gdk.threads_leave()
+        gtk.gdk.threads_enter()
+        
+        last = self.home.timeline.statuslist.last
+        count = self.home.timeline.update_tweets(tweets)
+        column = self.request_viewed_columns()[0]
+        show_notif = self.read_config_value('Notifications', 'home')
+        
+        log.debug(u'Actualizando %s' % column.title)
+        if self.updating[0] and show_notif == 'on':
+            self._notify_new_tweets(column, tweets, last, count)
+            
+        gtk.gdk.threads_leave()
+        self.updating[0] = False
         
     def update_column2(self, tweets):
-        log.debug(u'Actualizando las replies')
-        ##gtk.gdk.threads_enter()
-        def update_column2_temp():
-            count = self.home.replies.update_tweets(tweets)
-
-            if count > 0 and self.updating[2]:
-                p = self.parse_tweet(tweets.items[0])
-                icon = self.current_avatar_path(p.avatar)
-                text = util.unescape_text(p.text)
-                text = "<b>@%s</b> %s" % (p.username, text)
-                self.notify.new_replies(count, text, icon)
-                if not self.get_property('is-active'):
-                    self.tray.set_from_pixbuf(self.load_image('turpial-tray-update.png', True))
-                self.updating[2] = False
-            return False
-        gobject.idle_add(update_column2_temp)
-        ##gtk.gdk.threads_leave()
+        gtk.gdk.threads_enter()
         
-    def update_column3(self, recv):
-        log.debug(u'Actualizando mensajes directos')
-        ##gtk.gdk.threads_enter()
-        def update_column3_temp():
-            count = self.home.direct.update_tweets(recv)
-
-            if count > 0 and self.updating[3]:
-                p = self.parse_tweet(recv.items[0])
-                icon = self.current_avatar_path(p.avatar)
-                text = util.unescape_text(p.text)
-                text = "<b>@%s</b> %s" % (p.username, text)
-                self.notify.new_directs(count, text, icon)
-                if not self.get_property('is-active'):
-                    self.tray.set_from_pixbuf(self.load_image('turpial-tray-update.png', True))
-                self.updating[3] = False
-            return False
-        gobject.idle_add(update_column3_temp)
-        ##gtk.gdk.threads_leave()
+        last = self.home.replies.statuslist.last
+        count = self.home.replies.update_tweets(tweets)
+        column = self.request_viewed_columns()[1]
+        show_notif = self.read_config_value('Notifications', 'replies')
+        
+        log.debug(u'Actualizando %s' % column.title)
+        if self.updating[1] and show_notif == 'on':
+            self._notify_new_tweets(column, tweets, last, count)
+        
+        gtk.gdk.threads_leave()
+        self.updating[1] = False
+        
+    def update_column3(self, tweets):
+        gtk.gdk.threads_enter()
+        
+        last = self.home.direct.statuslist.last
+        count = self.home.direct.update_tweets(tweets)
+        column = self.request_viewed_columns()[2]
+        show_notif = self.read_config_value('Notifications', 'directs')
+        
+        log.debug(u'Actualizando %s' % column.title)
+        if self.updating[2] and show_notif == 'on':
+            self._notify_new_tweets(column, tweets, last, count)
+            
+        gtk.gdk.threads_leave()
+        self.updating[2] = False
         
     def update_favorites(self, favs):
         log.debug(u'Actualizando favoritos')
@@ -471,20 +541,28 @@ class Main(BaseGui, gtk.Window):
         
     def tweet_done(self, tweets):
         log.debug(u'Actualizando nuevo tweet')
-        ##gtk.gdk.threads_enter()
-        def tweet_done_temp():
-            if tweets.type == 'status':
+        gtk.gdk.threads_enter()
+        if tweets.type == 'status':
+            if self.updatebox.get_property('visible'):
                 self.updatebox.release()
                 self.updatebox.done()
-            else:
+            if self.uploadpic.get_property('visible'): 
+                self.uploadpic.release()
+                self.uploadpic.done()
+        else:
+            if self.updatebox.get_property('visible'):
                 self.updatebox.release(tweets.errmsg)
-            return False
-        gobject.idle_add(tweet_done_temp)
-        ##gtk.gdk.threads_leave()
+            if self.uploadpic.get_property('visible'):
+                self.uploadpic.release()
+        gtk.gdk.threads_leave()
         
         self.update_timeline(tweets)
         
     def set_mode(self):
+        # Necesario para que se calculen bien los valores
+        # Solo debe llamarse UNA vez
+        self.show_all()
+        
         cur_x, cur_y = self.get_position()
         cur_w, cur_h = self.get_size()
         
@@ -492,64 +570,74 @@ class Main(BaseGui, gtk.Window):
             size = self.wide_win_size
             self.resize(size[0], size[1])
             self.set_default_size(size[0], size[1])
-            x = (size[0] - cur_w) / 2
-            self.move(cur_x - x, cur_y)
+            if self.win_wide_pos[0] == -1 and self.win_wide_pos[1] == -1:
+                x = (size[0] - cur_w) / 2
+                self.move(cur_x - x, cur_y)
+            else:
+                self.move(self.win_wide_pos[0], self.win_wide_pos[1])
         else:
             size = self.single_win_size
             self.resize(size[0], size[1])
             self.set_default_size(size[0], size[1])
-            x = (cur_w - size[0]) / 2
-            self.move(cur_x + x, cur_y)
+            if self.win_single_pos[0] == -1 and self.win_single_pos[1] == -1:
+                x = (cur_w - size[0]) / 2
+                self.move(cur_x + x, cur_y)
+            else:
+                self.move(self.win_single_pos[0], self.win_single_pos[1])
         
-        log.debug('Cambiando a modo %s (%s)' % (self.workspace, size))
+        log.debug('Cambiando a modo %s %s' % (self.workspace, size))
         self.dock.change_mode(self.workspace)
         self.home.change_mode(self.workspace)
+        self.home.update_wrap(cur_w, self.workspace)
         self.profile.change_mode(self.workspace)
-        self.show_all()
         
     def update_config(self, config, global_cfg=None, thread=False):
         log.debug('Actualizando configuracion')
-        self.workspace = config.read('General', 'workspace')
         self.minimize = config.read('General', 'minimize-on-close')
         home_interval = int(config.read('General', 'home-update-interval'))
         replies_interval = int(config.read('General', 'replies-update-interval'))
         directs_interval = int(config.read('General', 'directs-update-interval'))
-        self.notify.update_config(config.read_section('Notifications'))
         
         if global_cfg: 
             self.version = global_cfg.read('App', 'version')
-        self.imgdir = config.imgdir
-        single_size = config.read('General', 'single-win-size').split(',')
-        wide_size = config.read('General', 'wide-win-size').split(',')
-        win_pos = config.read('General', 'window-position').split(',')
-        self.single_win_size = (int(single_size[0]), int(single_size[1]))
-        self.wide_win_size = (int(wide_size[0]), int(wide_size[1]))
-        self.win_pos = (int(win_pos[0]), int(win_pos[1]))
-        ##gtk.gdk.threads_enter()
-        def update_config_temp():    
-            self.set_mode()
-
-            if (self.home_interval != home_interval):
-                if self.home_timer: gobject.source_remove(self.home_timer)
-                self.home_interval = home_interval
-                self.home_timer = gobject.timeout_add(self.home_interval * 60 * 1000, self.download_column1)
-                log.debug('--Creado timer de Timeline cada %i min' % self.home_interval)
-
-            if (self.replies_interval != replies_interval):
-                if self.replies_timer: gobject.source_remove(self.replies_timer)
-                self.replies_interval = replies_interval
-                self.replies_timer = gobject.timeout_add(self.replies_interval * 60 * 1000, self.download_column2)
-                log.debug('--Creado timer de Replies cada %i min' % self.replies_interval)
-
-            if (self.directs_interval != directs_interval):
-                if self.directs_timer: gobject.source_remove(self.directs_timer)
-                self.directs_interval = directs_interval
-                self.directs_timer = gobject.timeout_add(self.directs_interval * 60 * 1000, self.download_column3)
-                log.debug('--Creado timer de Directs cada %i min' % self.directs_interval)
-            return False
-        gobject.idle_add(update_config_temp)
-        ##if thread: 
-        ##    gtk.gdk.threads_leave()
+            self.imgdir = config.imgdir
+            single_size = config.read('Window', 'single-win-size').split(',')
+            wide_size = config.read('Window', 'wide-win-size').split(',')
+            s_pos = config.read('Window', 'window-single-position').split(',')
+            w_pos = config.read('Window', 'window-wide-position').split(',')
+            self.win_state = config.read('Window', 'window-state')
+            self.win_visibility = config.read('Window', 'window-visibility')
+            self.single_win_size = (int(single_size[0]), int(single_size[1]))
+            self.wide_win_size = (int(wide_size[0]), int(wide_size[1]))
+            self.win_single_pos = (int(s_pos[0]), int(s_pos[1]))
+            self.win_wide_pos = (int(w_pos[0]), int(w_pos[1]))
+            gtk.gdk.threads_enter()
+        
+        if self.workspace <> config.read('General', 'workspace'):
+            self.workspace = config.read('General', 'workspace')
+        
+        self.set_mode()
+        
+        if (self.home_interval != home_interval):
+            if self.home_timer: gobject.source_remove(self.home_timer)
+            self.home_interval = home_interval
+            self.home_timer = gobject.timeout_add(self.home_interval * 60 * 1000, self.download_column1)
+            log.debug('--Creado timer de Timeline cada %i min' % self.home_interval)
+            
+        if (self.replies_interval != replies_interval):
+            if self.replies_timer: gobject.source_remove(self.replies_timer)
+            self.replies_interval = replies_interval
+            self.replies_timer = gobject.timeout_add(self.replies_interval * 60 * 1000, self.download_column2)
+            log.debug('--Creado timer de Replies cada %i min' % self.replies_interval)
+            
+        if (self.directs_interval != directs_interval):
+            if self.directs_timer: gobject.source_remove(self.directs_timer)
+            self.directs_interval = directs_interval
+            self.directs_timer = gobject.timeout_add(self.directs_interval * 60 * 1000, self.download_column3)
+            log.debug('--Creado timer de Directs cada %i min' % self.directs_interval)
+            
+        if thread: 
+            gtk.gdk.threads_leave()
         
     def size_request(self, widget, event, data=None):
         """Callback when the window changes its sizes. We use it to set the
@@ -558,29 +646,24 @@ class Main(BaseGui, gtk.Window):
         
         w, h = self.get_size()
         
-        if self.workspace == 'single':
-            if (w, h) == self.single_win_size: return
-            self.single_win_size = (w, h)
-        else:
+        if self.workspace == 'wide':
             if (w, h) == self.wide_win_size: return
             self.wide_win_size = (w, h)
-        
-        self.win_pos = self.get_position()
+            self.win_wide_pos = self.get_position()
+        else:
+            if (w, h) == self.single_win_size: return
+            self.single_win_size = (w, h)
+            self.win_single_pos = self.get_position()
         
         self.contenido.update_wrap(w, self.workspace)
-        
         return
     
     def move_event(self, widget, event):
-        self.win_pos = self.get_position()
+        if self.workspace == 'wide':
+            self.win_wide_pos = self.get_position()
+        else:
+            self.win_single_pos = self.get_position()
         
     def following_error(self, message, follow):
         self.notify.following_error(message, follow)
-        
-    def __on_key_press(self, widget, event):
-        keyname = gtk.gdk.keyval_name(event.keyval)
-        if (event.state & gtk.gdk.CONTROL_MASK) and keyname.lower() == 'n':
-            self.show_update_box()
-            return True
-        return False
 

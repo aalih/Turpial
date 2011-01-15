@@ -22,7 +22,7 @@ class BaseGui:
         self.__controller = controller
         self.__user_pics = {}
         self.__queued_pics = []
-        self.updating = {1: False, 2: False, 3: False}
+        self.updating = [False, False, False]
         
         self.columns_lists = {}
         self.columns_viewed = []
@@ -32,10 +32,14 @@ class BaseGui:
         
         # Initialize gettext
         gettext_domain = 'turpial'
-        # FIXME: Definir path de localedir en caso de no encontrar esperado
-        # localedir = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'i18n'))
-        # trans = gettext.install(gettext_domain, localedir)
-        trans = gettext.install(gettext_domain)
+        # Definicion de localedir en modo desarrollo
+        if os.path.isdir(os.path.join(os.path.dirname(__file__), '..', 'i18n')):
+            localedir = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'i18n'))
+            trans = gettext.install(gettext_domain, localedir)
+            log.debug('LOCALEDIR: %s' % localedir)
+        else:
+            trans = gettext.install(gettext_domain)
+            
     # ------------------------------------------------------------
     # Private/Internal methods
     # ------------------------------------------------------------
@@ -47,16 +51,7 @@ class BaseGui:
         self.__user_pics[user] = pic
         self.__queued_pics.remove(pic)
         self.update_user_avatar(user, pic)
-        
-    def __get_real_tweet(self, tweet):
-        '''Get the tweet retweeted'''
-        retweet_by = None
-        if tweet.has_key('retweeted_status'):
-            retweet_by = tweet['user']['screen_name']
-            tweet = tweet['retweeted_status']
-        
-        return tweet, retweet_by
-        
+    
     # ------------------------------------------------------------
     # Common methods to all interfaces
     # ------------------------------------------------------------
@@ -91,10 +86,8 @@ class BaseGui:
     
     def parse_tweet(self, xtweet):
         '''Decompose tweet in basic parts'''
-        
         xtweet.text = util.unescape_text(xtweet.text)
         xtweet.source = util.detect_client(xtweet)
-        xtweet.timestamp = util.get_timestamp(xtweet)
         return xtweet
         
     def after_destroy_status(self, timeline, favs):
@@ -105,6 +98,10 @@ class BaseGui:
     def after_destroy_direct(self, directs):
         '''Update columns after destroy a direct'''
         self.update_directs(directs)
+        
+    def read_config_value(self, section, option):
+        '''Read specific value from config'''
+        return self.__controller.config.read(section, option)
         
     def read_config(self):
         '''Read all the user config'''
@@ -122,13 +119,13 @@ class BaseGui:
         '''Saves the global config'''
         self.__controller.save_global_config(new_config)
     
-    def request_remember(self, username, password, rem=False):
+    def request_remember(self, username, password, protocol, rem=False):
         '''Request remember'''
-        self.__controller.remember(username, password, rem)
+        self.__controller.remember(username, password, protocol, rem)
         
-    def request_remembered(self):
+    def request_remembered(self, protocol):
         '''Request simple signin'''
-        return self.__controller.get_remembered()
+        return self.__controller.get_remembered(protocol)
     
     def request_signin(self, username, password, protocol):
         '''Request simple signin'''
@@ -200,9 +197,9 @@ class BaseGui:
         '''Short URL'''
         self.__controller.short_url(longurl, callback)
         
-    def request_upload_pic(self, filename, callback):
+    def request_upload_pic(self, filename, message, callback):
         '''Upload a pic'''
-        self.__controller.upload_pic(filename, callback)
+        self.__controller.upload_pic(filename, message, callback)
         
     def request_update_status(self, text, in_reply_id):
         '''Tweet'''
@@ -232,10 +229,6 @@ class BaseGui:
         '''Get the muted list'''
         return self.__controller.get_muted_list()
         
-    def request_update_muted(self, muted_users):
-        '''Update the muted list'''
-        self.__controller.update_muted(muted_users)
-        
     def request_destroy_direct(self, id):
         '''Destroy a direct message'''
         self.__controller.destroy_direct(id)
@@ -256,9 +249,17 @@ class BaseGui:
         '''Get the profiles url'''
         return self.__controller.get_profiles_url()
         
+    def request_viewed_columns(self):
+        '''Get the array for viewed columns'''
+        return self.__controller.get_viewed_columns()
+        
     def request_change_column(self, index, new_id):
         ''' Change the column at index for the indicated by new_id '''
         self.__controller.change_column(index, new_id)
+        
+    def request_is_friend(self, user):
+        ''' Ask if a user is friend or not '''
+        self.__controller.is_friend(user)
         
     def manual_update(self, id):
         if id == 0:
@@ -290,23 +291,23 @@ class BaseGui:
     # Estos métodos deben ser llamados por la clase hija cada cierto tiempo
     
     def download_column1(self):
-        if self.updating[1]: return True
+        if self.updating[0]: return True
         
-        self.updating[1] = True
+        self.updating[0] = True
         self.__controller._update_column1()
         return True
         
     def download_column2(self):
-        if self.updating[2]: return True
+        if self.updating[1]: return True
         
-        self.updating[2] = True
+        self.updating[1] = True
         self.__controller._update_column2()
         return True
         
     def download_column3(self):
-        if self.updating[3]: return True
+        if self.updating[2]: return True
         
-        self.updating[3] = True
+        self.updating[2] = True
         self.__controller._update_column3()
         return True
         
@@ -316,13 +317,18 @@ class BaseGui:
         
     def download_favorites(self):
         self.__controller._update_favorites()
+        return True
+        
+    def download_friends(self):
+        self.__controller._update_friends()
+        return True
         
     # ------------------------------------------------------------
     # Methods to be overwritten
     # ------------------------------------------------------------
     
     def resize_avatar(self, pic):
-        raise NotImplemented
+        raise NotImplementedError
         
     def main_loop(self):
         raise NotImplementedError
@@ -330,7 +336,7 @@ class BaseGui:
     def show_login(self):
         raise NotImplementedError
         
-    def show_main(self, config, profile):
+    def show_main(self, config, global_config, profile):
         raise NotImplementedError
         
     def set_lists(self, lists, viewed):
