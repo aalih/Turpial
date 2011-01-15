@@ -36,15 +36,14 @@ class Notification:
             log.debug('Módulo deshabilitado. No hay notificaciones')
             return
             
-        if self.active and NOTIFY:
-            if pynotify.init("Turpial"):
-                if not icon:
-                    iconpath = os.path.join(os.path.dirname(__file__), 'data', 
-                        'pixmaps', 'turpial-notification.png')
-                    icon = os.path.realpath(iconpath)
-                icon = "file://%s" % icon
-                notification = pynotify.Notification(title, message, icon)
-                notification.show()
+        if self.active:
+            notification = gtkPopupNotify.NotificationStack(timeout=10)
+            notification.edge_offset_y=20
+            if not icon:
+                iconpath = os.path.join(os.path.dirname(__file__),  
+                    '..', '..', 'data', 'pixmaps', 'turpial-notification.png')
+                icon = os.path.realpath(iconpath)
+            notification.new_popup(title, message, icon)
     
     def new_tweets(self, title, count, tobject, tweet, icon):
         self.popup('%s (%i %s)' % (title, count, tobject), tweet, icon)
