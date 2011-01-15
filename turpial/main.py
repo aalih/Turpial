@@ -23,13 +23,6 @@ from turpial.api.turpialapi import TurpialAPI
 from turpial.config import ConfigHandler, ConfigApp, ConfigProtocol, PROTOCOLS
 from turpial.ui.cmd.main import Main as _CMD
 
-try:
-    import ctypes
-    libc = ctypes.CDLL('libc.so.6')
-    libc.prctl(15, 'turpial', 0, 0)
-except ImportError:
-    pass
-
 INTERFACES = ['cmd']
 try:
     from turpial.ui.gtk.main import Main as _GTK

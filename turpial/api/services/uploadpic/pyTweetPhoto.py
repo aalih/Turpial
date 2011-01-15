@@ -38,9 +38,17 @@ __version__ = '0.2'
 
 import httplib, mimetypes
 import urllib, urlparse, base64
-import simplejson
 from xml.dom import minidom as xml
 
+def _py26_or_greater():
+    import sys
+    return sys.hexversion > 0x20600f0
+
+if _py26_or_greater():
+    import json as simplejson
+else:
+    import simplejson
+ 
 try:
 	import cStringIO as StringIO
 except ImportError:

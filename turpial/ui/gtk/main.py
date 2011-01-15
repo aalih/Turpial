@@ -319,44 +319,46 @@ class Main(BaseGui, gtk.Window):
         
         self.update_config(config, global_cfg, True)
         
-        gtk.gdk.threads_enter()
-        self.contentbox.add(self.contenido)
-        
-        self.statusbar = gtk.Statusbar()
-        self.statusbar.push(0, _('Wait a few seconds while I load everything...'))
-        if (self.vbox is not None): self.remove(self.vbox)
-        
-        self.vbox = gtk.VBox(False, 0)
-        self.vbox.pack_start(self.contentbox, True, True, 0)
-        self.vbox.pack_start(self.dock, False, False, 0)
-        self.vbox.pack_start(self.statusbar, False, False, 0)
-        
-        self.profile.set_user_profile(p)
-        self.me = p.items.username
-        title = 'Turpial - %s' % self.me
-        self.set_title(title)
-        self.tray.set_tooltip(title)
-        
-        if config.read('General', 'profile-color') == 'on':
-            self.link_color = p.items.profile_link_color
-        
-        self.add(self.vbox)
-        self.show_all()
-        
-        '''
-        if self.win_state == 'minimized':
-            self.iconify()
-        elif self.win_state == 'maximized':
-            self.maximize()
-        elif self.win_visibility == 'hide':
-            self.hide()
-        '''
-        
-        self.hnd_state = self.connect('window-state-event', self.__on_change_state)
-        
-        #if (self.win_pos[0] > 0 and self.win_pos[1] > 0):
-        #    self.move(self.win_pos[0], self.win_pos[1])
-        gtk.gdk.threads_leave()
+        ##gtk.gdk.threads_enter()
+        def show_main_temp():
+            self.contentbox.add(self.contenido)
+            
+            self.statusbar = gtk.Statusbar()
+            self.statusbar.push(0, _('Wait a few seconds while I load everything...'))
+            if (self.vbox is not None): self.remove(self.vbox)
+            
+            self.vbox = gtk.VBox(False, 0)
+            self.vbox.pack_start(self.contentbox, True, True, 0)
+            self.vbox.pack_start(self.dock, False, False, 0)
+            self.vbox.pack_start(self.statusbar, False, False, 0)
+            
+            self.profile.set_user_profile(p)
+            self.me = p.items.username
+            title = 'Turpial - %s' % self.me
+            self.set_title(title)
+            self.tray.set_tooltip(title)
+            
+            if config.read('General', 'profile-color') == 'on':
+                self.link_color = p.items.profile_link_color
+            
+            self.add(self.vbox)
+            self.show_all()
+            
+            '''
+            if self.win_state == 'minimized':
+                self.iconify()
+            elif self.win_state == 'maximized':
+                self.maximize()
+            elif self.win_visibility == 'hide':
+                self.hide()
+            '''
+            
+            self.hnd_state = self.connect('window-state-event', self.__on_change_state)
+            
+            #if (self.win_pos[0] > 0 and self.win_pos[1] > 0):
+            #    self.move(self.win_pos[0], self.win_pos[1])
+        gobject.idle_add(show_main_temp)
+        ##gtk.gdk.threads_leave()
         
         if config.read('Notifications', 'login') == 'on':
             self.notify.login(p.items)
@@ -416,47 +418,47 @@ class Main(BaseGui, gtk.Window):
         self.profile.search.start_update()
         
     def update_column1(self, tweets):
-        gtk.gdk.threads_enter()
-        
-        last = self.home.timeline.statuslist.last
-        count = self.home.timeline.update_tweets(tweets)
-        column = self.request_viewed_columns()[0]
-        show_notif = self.read_config_value('Notifications', 'home')
-        
-        log.debug(u'Actualizando %s' % column.title)
-        if self.updating[0] and show_notif == 'on':
-            self._notify_new_tweets(column, tweets, last, count)
+        ##gtk.gdk.threads_enter()
+        def update_column_temp():
+            last = self.home.timeline.statuslist.last
+            count = self.home.timeline.update_tweets(tweets)
+            column = self.request_viewed_columns()[0]
+            show_notif = self.read_config_value('Notifications', 'home')
             
-        gtk.gdk.threads_leave()
+            log.debug(u'Actualizando %s' % column.title)
+            if self.updating[0] and show_notif == 'on':
+                self._notify_new_tweets(column, tweets, last, count)
+        gobject.idle_add(update_column_temp)    
+        ##gtk.gdk.threads_leave()
         self.updating[0] = False
         
     def update_column2(self, tweets):
-        gtk.gdk.threads_enter()
-        
-        last = self.home.replies.statuslist.last
-        count = self.home.replies.update_tweets(tweets)
-        column = self.request_viewed_columns()[1]
-        show_notif = self.read_config_value('Notifications', 'replies')
-        
-        log.debug(u'Actualizando %s' % column.title)
-        if self.updating[1] and show_notif == 'on':
-            self._notify_new_tweets(column, tweets, last, count)
-        
-        gtk.gdk.threads_leave()
+        ##gtk.gdk.threads_enter()
+        def update_column2_temp():
+            last = self.home.replies.statuslist.last
+            count = self.home.replies.update_tweets(tweets)
+            column = self.request_viewed_columns()[1]
+            show_notif = self.read_config_value('Notifications', 'replies')
+            
+            log.debug(u'Actualizando %s' % column.title)
+            if self.updating[1] and show_notif == 'on':
+                self._notify_new_tweets(column, tweets, last, count)
+        gobject.idle_add(update_column2_temp)
+        ##gtk.gdk.threads_leave()
         self.updating[1] = False
         
     def update_column3(self, tweets):
-        gtk.gdk.threads_enter()
-        
-        last = self.home.direct.statuslist.last
-        count = self.home.direct.update_tweets(tweets)
-        column = self.request_viewed_columns()[2]
-        show_notif = self.read_config_value('Notifications', 'directs')
-        
-        log.debug(u'Actualizando %s' % column.title)
-        if self.updating[2] and show_notif == 'on':
-            self._notify_new_tweets(column, tweets, last, count)
+        ##gtk.gdk.threads_enter()
+        def update_column3_temp():
+            last = self.home.direct.statuslist.last
+            count = self.home.direct.update_tweets(tweets)
+            column = self.request_viewed_columns()[2]
+            show_notif = self.read_config_value('Notifications', 'directs')
             
+            log.debug(u'Actualizando %s' % column.title)
+            if self.updating[2] and show_notif == 'on':
+                self._notify_new_tweets(column, tweets, last, count)
+        gobject.idle_add(update_column3_temp)    
         gtk.gdk.threads_leave()
         self.updating[2] = False
         
@@ -541,20 +543,22 @@ class Main(BaseGui, gtk.Window):
         
     def tweet_done(self, tweets):
         log.debug(u'Actualizando nuevo tweet')
-        gtk.gdk.threads_enter()
-        if tweets.type == 'status':
-            if self.updatebox.get_property('visible'):
-                self.updatebox.release()
-                self.updatebox.done()
-            if self.uploadpic.get_property('visible'): 
-                self.uploadpic.release()
-                self.uploadpic.done()
-        else:
-            if self.updatebox.get_property('visible'):
-                self.updatebox.release(tweets.errmsg)
-            if self.uploadpic.get_property('visible'):
-                self.uploadpic.release()
-        gtk.gdk.threads_leave()
+        ##gtk.gdk.threads_enter()
+        def tweet_done_temp():
+            if tweets.type == 'status':
+                if self.updatebox.get_property('visible'):
+                    self.updatebox.release()
+                    self.updatebox.done()
+                if self.uploadpic.get_property('visible'): 
+                    self.uploadpic.release()
+                    self.uploadpic.done()
+            else:
+                if self.updatebox.get_property('visible'):
+                    self.updatebox.release(tweets.errmsg)
+                if self.uploadpic.get_property('visible'):
+                    self.uploadpic.release()
+        gobject.idle_add(tweet_done_temp)
+        ##gtk.gdk.threads_leave()
         
         self.update_timeline(tweets)
         
