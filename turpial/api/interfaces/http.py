@@ -11,6 +11,7 @@ import urllib2
 import urllib
 import httplib
 import logging
+import platform
 
 from base64 import b64encode
 from urllib import urlencode
@@ -36,6 +37,8 @@ def detect_desktop_environment():
         desktop_environment = 'kde'
     elif os.environ.get('GNOME_DESKTOP_SESSION_ID'):
         desktop_environment = 'gnome'
+    elif platform.system() == 'Windows':
+        desktop_environment = 'ms-windows'
     # FIXME: Deshabilitado temporalmente mientras se encuentra una forma de 
     # detectar otros tipos de escritorios
     '''
@@ -62,7 +65,10 @@ class TurpialHTTP:
         socket.setdefaulttimeout(timeout)
         proxies = {}
         
-        if detect_desktop_environment() == 'gnome' and GCONF:
+        desktop_environment = detect_desktop_environment()
+        self.log.debug('Desktop: %s' % desktop_environment)
+
+        if desktop_environment == 'gnome' and GCONF:
             gclient = gconf.client_get_default()
             if gclient.get_bool('/system/http_proxy/use_http_proxy'):
                 proxies['http'] = "%s:%d" % (
@@ -74,19 +80,38 @@ class TurpialHTTP:
                     proxies['https'] = "%s:%d" % (
                         gclient.get_string('/system/proxy/secure_host'), 
                         gclient.get_int('/system/proxy/secure_port'))
-            
-            if proxies:
-                self.log.debug('Proxies detectados: %s' % proxies)
-                if _py26_or_greater():
-                    opener = urllib2.build_opener(urllib2.ProxyHandler(proxies), urllib2.HTTPHandler)
-                else:
-                    if proxies.has_key('https'):
-                        opener = urllib2.build_opener(ConnectHTTPSHandler(proxy=proxies['https']))
+        elif desktop_environment == 'ms-windows':
+            try:
+                import _winreg
+                aReg = _winreg.ConnectRegistry(None, _winreg.HKEY_CURRENT_USER)
+                aKey = _winreg.OpenKey(aReg,
+                    r"Software\Microsoft\Windows\CurrentVersion\Internet Settings")
+                proxy_enabled = _winreg.QueryValueEx(aKey, 'ProxyEnable')
+                if int(proxy_enabled[0]):
+                    proxy_server = _winreg.QueryValueEx(aKey, 'ProxyServer')[0]
+                    if proxy_server.find(';') < 0 or proxy_server.find('=') < 0:
+                        #'Use same proxy' option selected
+                        proxies['http'] = proxy_server
+                        proxies['https'] = proxy_server
                     else:
-                        opener = urllib2.build_opener(ConnectHTTPSHandler(proxy=proxies['http']))
-                urllib2.install_opener(opener)
+                        proxies = dict(map(lambda x: x.split('='),
+                                           proxy_server.split(';')))
+
+            except Exception, e:
+                self.log.debug('Error cargando los valores del proxy: %s' % e)
+
+        if proxies:
+            self.log.debug('Proxies detectados: %s' % proxies)
+            if _py26_or_greater():
+                opener = urllib2.build_opener(urllib2.ProxyHandler(proxies), urllib2.HTTPHandler)
             else:
-                self.log.debug('No se detectaron proxies en el sistema')
+                if proxies.has_key('https'):
+                    opener = urllib2.build_opener(ConnectHTTPSHandler(proxy=proxies['https']))
+                else:
+                    opener = urllib2.build_opener(ConnectHTTPSHandler(proxy=proxies['http']))
+            urllib2.install_opener(opener)
+        else:
+            self.log.debug('No se detectaron proxies en el sistema')
         
     def __build(self, uri, args={}):
         '''Construir la petición HTTP'''
