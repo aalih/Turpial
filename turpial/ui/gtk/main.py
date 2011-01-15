@@ -615,12 +615,12 @@ class Main(BaseGui, gtk.Window):
             self.wide_win_size = (int(wide_size[0]), int(wide_size[1]))
             self.win_single_pos = (int(s_pos[0]), int(s_pos[1]))
             self.win_wide_pos = (int(w_pos[0]), int(w_pos[1]))
-            gtk.gdk.threads_enter()
+            ##gtk.gdk.threads_enter()
         
         if self.workspace <> config.read('General', 'workspace'):
             self.workspace = config.read('General', 'workspace')
         
-        self.set_mode()
+        gobject.idle_add(self.set_mode)
         
         if (self.home_interval != home_interval):
             if self.home_timer: gobject.source_remove(self.home_timer)
@@ -640,8 +640,8 @@ class Main(BaseGui, gtk.Window):
             self.directs_timer = gobject.timeout_add(self.directs_interval * 60 * 1000, self.download_column3)
             log.debug('--Creado timer de Directs cada %i min' % self.directs_interval)
             
-        if thread: 
-            gtk.gdk.threads_leave()
+        ##if thread: 
+        ##    gtk.gdk.threads_leave()
         
     def size_request(self, widget, event, data=None):
         """Callback when the window changes its sizes. We use it to set the
